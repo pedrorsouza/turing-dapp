@@ -45,9 +45,37 @@ export default function Dapp() {
     await init(addr);
   };
 
+  // Pede à MetaMask para trocar para a rede Hardhat (e adicioná-la, se faltar).
+  const switchToHardhat = async () => {
+    const chainId = "0x" + HARDHAT_CHAIN_ID.toString(16);
+    try {
+      await window.ethereum.request({ method: "wallet_switchEthereumChain", params: [{ chainId }] });
+    } catch (e) {
+      if (e.code !== 4902) throw e; // 4902 = rede desconhecida pela MetaMask
+      await window.ethereum.request({
+        method: "wallet_addEthereumChain",
+        params: [{
+          chainId,
+          chainName: "Hardhat Local",
+          rpcUrls: ["http://127.0.0.1:8545"],
+          nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+        }],
+      });
+    }
+  };
+
   const init = async (addr) => {
-    const provider = new ethers.BrowserProvider(window.ethereum);
-    const { chainId } = await provider.getNetwork();
+    let provider = new ethers.BrowserProvider(window.ethereum);
+    let { chainId } = await provider.getNetwork();
+    if (chainId !== HARDHAT_CHAIN_ID) {
+      try {
+        await switchToHardhat();
+        provider = new ethers.BrowserProvider(window.ethereum);
+        ({ chainId } = await provider.getNetwork());
+      } catch {
+        // usuário recusou a troca; cai na mensagem abaixo
+      }
+    }
     if (chainId !== HARDHAT_CHAIN_ID) {
       setMsg({ type: "err", text: "Conecte a MetaMask na rede Hardhat local (localhost:8545, chainId 31337)." });
       return;
